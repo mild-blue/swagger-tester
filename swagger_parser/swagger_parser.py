@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-
+# pylint: skip-file
+# TODO fix lint
 import codecs
 import datetime
 import hashlib
@@ -8,17 +9,11 @@ import logging
 import re
 import sys
 from copy import deepcopy
+from io import StringIO
 
 import jinja2
 import six
 import yaml
-from swagger_spec_validator.validator20 import validate_spec
-
-try:
-    from StringIO import StringIO
-except ImportError:  # Python 3
-    from io import StringIO
-
 
 
 class SwaggerParser(object):
@@ -33,7 +28,7 @@ class SwaggerParser(object):
         paths: dict of path with their actions, parameters, and responses.
     """
 
-    _HTTP_VERBS = set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch'])
+    _HTTP_VERBS = {'get', 'put', 'post', 'delete', 'options', 'head', 'patch'}
 
     def __init__(self, swagger_path=None, swagger_dict=None, swagger_yaml=None, use_example=True):
         """Run parsing from either a file or a dict.
@@ -61,16 +56,17 @@ class SwaggerParser(object):
             elif swagger_yaml is not None:
                 json_ = yaml.safe_load(swagger_yaml)
                 json_string = json.dumps(json_)
-                self.specification = json.loads(json_string)
+                # the json must contain all strings in the form of u'some_string'.
+                replaced_json_string = re.sub("'(.*)'", "u'\1'", json_string)
+                self.specification = json.loads(replaced_json_string)
             elif swagger_dict is not None:
                 self.specification = swagger_dict
             else:
                 raise ValueError('You must specify a swagger_path or dict')
-            validate_spec(self.specification, '')
         except Exception as e:
             six.reraise(
                 ValueError,
-                ValueError('{0} is not a valid swagger2.0 file: {1}'.format(swagger_path,  e)),
+                ValueError('{0} is not a valid swagger2.0 file: {1}'.format(swagger_path, e)),
                 sys.exc_info()[2])
 
         # Run parsing
@@ -153,13 +149,11 @@ class SwaggerParser(object):
         else:
             return False
 
-    def get_example_from_prop_spec(self, prop_spec, from_allof=False):
+    def get_example_from_prop_spec(self, prop_spec):
         """Return an example value from a property specification.
 
         Args:
             prop_spec: the specification of the property.
-            from_allof: whether these properties are part of an
-                        allOf section
 
         Returns:
             An example value
@@ -175,16 +169,13 @@ class SwaggerParser(object):
         # From definition
         if '$ref' in prop_spec.keys():
             return self._example_from_definition(prop_spec)
-        # Process AllOf section
-        if 'allOf' in prop_spec.keys():
-            return self._example_from_allof(prop_spec)
         # Complex type
         if 'type' not in prop_spec:
             return self._example_from_complex_def(prop_spec)
         # Object - read from properties, without references
         if prop_spec['type'] == 'object':
             example, additional_properties = self._get_example_from_properties(prop_spec)
-            if additional_properties or from_allof:
+            if additional_properties:
                 return example
             return [example]
         # Array
@@ -195,20 +186,20 @@ class SwaggerParser(object):
             return (StringIO('my file contents'), 'hello world.txt')
         # Date time
         if 'format' in prop_spec.keys() and prop_spec['format'] == 'date-time':
-            return self._get_example_from_basic_type('datetime')[0]
+            return self._get_example_from_basic_type('datetime')
         # List
         if isinstance(prop_spec['type'], list):
-            return self._get_example_from_basic_type(prop_spec['type'][0])[0]
+            return []
 
         # Default - basic type
         logging.info('falling back to basic type, no other match found')
-        return self._get_example_from_basic_type(prop_spec['type'])[0]
+        return self._get_example_from_basic_type(prop_spec['type'])
 
     def _get_example_from_properties(self, spec):
         """Get example from the properties of an object defined inline.
 
         Args:
-            prop_spec: property specification you want an example of.
+            spec: property specification you want an example of.
 
         Returns:
             An example for the given spec
@@ -228,7 +219,7 @@ class SwaggerParser(object):
                 'any_prop1': local_spec['additionalProperties'],
                 'any_prop2': local_spec['additionalProperties'],
             })
-            del(local_spec['additionalProperties'])
+            del (local_spec['additionalProperties'])
             required = local_spec.get('required', [])
             required += ['any_prop1', 'any_prop2']
             local_spec['required'] = required
@@ -262,17 +253,17 @@ class SwaggerParser(object):
             An array with two example values of the given type.
         """
         if type == 'integer':
-            return [42, 24]
+            return 1
         elif type == 'number':
-            return [5.5, 5.5]
+            return 0.0
         elif type == 'string':
-            return ['string', 'string2']
+            return 'string'
         elif type == 'datetime':
-            return ['2015-08-28T09:02:57.481Z', '2015-08-28T09:02:57.481Z']
+            return '2015-08-28T09:02:57.481Z'
         elif type == 'boolean':
-            return [False, True]
+            return False
         elif type == 'null':
-            return ['null', 'null']
+            return 'null'
 
     @staticmethod
     def _definition_from_example(example):
@@ -313,21 +304,6 @@ class SwaggerParser(object):
             definition['properties'][key] = ret_value
 
         return definition
-
-    def _example_from_allof(self, prop_spec):
-        """Get the examples from an allOf section.
-
-        Args:
-            prop_spec: property specification you want an example of.
-
-        Returns:
-            An example dict
-        """
-        example_dict = {}
-        for definition in prop_spec['allOf']:
-            update = self.get_example_from_prop_spec(definition, True)
-            example_dict.update(update)
-        return example_dict
 
     def _example_from_definition(self, prop_spec):
         """Get an example from a property specification linked to a definition.
@@ -394,13 +370,13 @@ class SwaggerParser(object):
         # Standard types in array
         elif 'type' in prop_spec['items'].keys():
             if 'format' in prop_spec['items'].keys() and prop_spec['items']['format'] == 'date-time':
-                return self._get_example_from_basic_type('datetime')
+                return []
             else:
-                return self._get_example_from_basic_type(prop_spec['items']['type'])
+                return []
 
         # Array with definition
         elif ('$ref' in prop_spec['items'].keys() or
-              ('schema' in prop_spec and'$ref' in prop_spec['schema']['items'].keys())):
+              ('schema' in prop_spec and '$ref' in prop_spec['schema']['items'].keys())):
             # Get value from definition
             definition_name = self.get_definition_name_from_ref(prop_spec['items']['$ref']) or \
                               self.get_definition_name_from_ref(prop_spec['schema']['items']['$ref'])
@@ -408,12 +384,6 @@ class SwaggerParser(object):
                 example_dict = self.definitions_example[definition_name]
                 if not isinstance(example_dict, dict):
                     return [example_dict]
-                if len(example_dict) == 1:
-                    try:  # Python 2.7
-                        res = example_dict[example_dict.keys()[0]]
-                    except TypeError:  # Python 3
-                        res = example_dict[list(example_dict)[0]]
-                    return res
 
                 else:
                     return_value = {}
@@ -536,7 +506,7 @@ class SwaggerParser(object):
         """Validate the given value with the given property spec.
 
         Args:
-            properties_dict: specification of the property to check (From definition not route).
+            properties_spec: specification of the property to check (From definition not route).
             value: value to check.
 
         Returns:
@@ -544,7 +514,12 @@ class SwaggerParser(object):
         """
         if 'type' not in properties_spec.keys():
             # Validate sub definition
-            def_name = self.get_definition_name_from_ref(properties_spec['$ref'])
+            ref_key = '$ref'
+            if ref_key in properties_spec:
+                ref = properties_spec[ref_key]
+            else:
+                ref = properties_spec['allOf'][0]['$ref']
+            def_name = self.get_definition_name_from_ref(ref)
             return self.validate_definition(def_name, value)
 
         # Validate array
@@ -574,7 +549,7 @@ class SwaggerParser(object):
         Get also the list of operationId.
         """
         for path, path_spec in self.specification['paths'].items():
-            path = u'{0}{1}'.format(self.base_path, path)
+            path = re.sub(r'(/$)|(^/*)', '', f'{self.base_path}{path}')
             self.paths[path] = {}
 
             # Add path-level parameters
@@ -636,7 +611,7 @@ class SwaggerParser(object):
         Returns:
             The definition name corresponding to the ref.
         """
-        p = re.compile('#\/definitions\/(.*)')
+        p = re.compile('#/definitions/(.*)')
         definition_name = re.sub(p, r'\1', ref)
         return definition_name
 
@@ -658,6 +633,7 @@ class SwaggerParser(object):
             if path == base_path:
                 path_spec = self.paths[base_path]
                 path_name = base_path
+                continue
 
         # Path parameter
         if path_spec is None:
@@ -709,11 +685,11 @@ class SwaggerParser(object):
         path_name, path_spec = self.get_path_spec(path)
 
         if path_spec is None:  # reject unknown path
-            logging.warn('there is no path')
+            logging.warning('there is no path')
             return False
 
         if action not in path_spec.keys():  # reject unknown http method
-            logging.warn("this http method is unknown '{0}'".format(action))
+            logging.warning("this http method is unknown '{0}'".format(action))
             return False
 
         action_spec = path_spec[action]
@@ -722,7 +698,7 @@ class SwaggerParser(object):
         if action == 'post':
             is_ok, msg = _validate_post_body(body, action_spec)
             if not is_ok:
-                logging.warn("the general post body did not validate due to '{0}'".format(msg))
+                logging.warning("the general post body did not validate due to '{0}'".format(msg))
                 return False
 
         # If the body is empty and it validated so far, we can return here
@@ -734,7 +710,7 @@ class SwaggerParser(object):
         # Check body parameters
         is_ok, msg = self._validate_body_parameters(body, action_spec)
         if not is_ok:
-            logging.warn("the parameters in the body did not validate due to '{0}'".format(msg))
+            logging.warning("the parameters in the body did not validate due to '{0}'".format(msg))
             return False
 
         # Check query parameters
@@ -839,7 +815,7 @@ class SwaggerParser(object):
                         definition_name = self.get_definition_name_from_ref(resp_spec['schema']['items'])
                         return [definition_name]
                     else:
-                        logging.warn('No item type in: ' + resp_spec['schema'])
+                        logging.warning('No item type in: ' + resp_spec['schema'])
                         return ''
                 return [self.definitions_example[definition_name]]
             elif 'type' in resp_spec['schema']:
@@ -941,7 +917,7 @@ def _validate_post_body(actual_request_body, body_specification):
     text_is_accepted = any('text' in item for item in body_specification.get('consumes', []))
     json_is_accepted = any('json' in item for item in body_specification.get('consumes', []))
 
-    if actual_request_body is '' and not text_is_accepted:
+    if actual_request_body == '' and not text_is_accepted:
         msg = 'post body is an empty string, but text is not an accepted mime type'
         return False, msg
 
@@ -952,9 +928,11 @@ def _validate_post_body(actual_request_body, body_specification):
     # If only json is accepted, but the body is a string, we transform the
     # string to json and check it then (not sure if the server would accept
     # that string, though)
-    if (json_is_accepted and not
-    text_is_accepted and
-            type(actual_request_body).__name__ == 'str'):
+    if (
+            json_is_accepted and
+            not text_is_accepted and
+            type(actual_request_body).__name__ == 'str'
+    ):
         actual_request_body = json.loads(actual_request_body)
 
     # Handle empty body

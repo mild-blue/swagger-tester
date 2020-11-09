@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
-
+# pylint: skip-file
+# TODO fix lint
 import json
 import logging
-import os
-import requests
-import six
 import time
+from typing import Dict, Set
+from urllib.parse import urlencode
 
-try:
-    from urllib import urlencode
-except ImportError:  # Python 3
-    from urllib.parse import urlencode
-
-import connexion
+import six
+from werkzeug import Client
 
 from swagger_parser import SwaggerParser
 
@@ -52,7 +48,7 @@ def validate_definition(swagger_parser, valid_response, response):
 
     Args:
         swagger_parser: instance of swagger parser.
-        body: valid body answer from spec.
+        valid_response: valid response answer from spec.
         response: response of the request.
     """
     # additionalProperties do not match any definition because the keys
@@ -81,14 +77,15 @@ def validate_definition(swagger_parser, valid_response, response):
 
     # Not a dict and not a text
     if ((not isinstance(response, dict) or not isinstance(valid_response, dict)) and
-        (not isinstance(response, (six.text_type, six.string_types)) or
-            not isinstance(valid_response, (six.text_type, six.string_types)))):
+            (not isinstance(response, (six.text_type, six.string_types)) or
+             not isinstance(valid_response, (six.text_type, six.string_types)))):
         assert type(response) == type(valid_response)
     elif isinstance(response, dict) and isinstance(valid_response, dict):
         # Check if there is a definition that match body and response
         valid_definition = swagger_parser.get_dict_definition(valid_response, get_list=True)
         actual_definition = swagger_parser.get_dict_definition(response, get_list=True)
-        assert len(set(valid_definition).intersection(actual_definition)) >= 1
+        assert len(set(valid_definition).intersection(actual_definition)) >= 1, \
+            f'Responses {valid_response} and {response} not compatible'
 
 
 def parse_parameters(url, action, path, request_args, swagger_parser):
@@ -178,7 +175,7 @@ def get_method_from_action(client, action):
 
     Args:
         client: flask client.
-        aciton: action name.
+        action: action name.
 
     Returns:
         A flask client function.
@@ -189,18 +186,23 @@ def get_method_from_action(client, action):
     return client.__getattribute__(action)
 
 
-def swagger_test(swagger_yaml_path=None, app_url=None, authorize_error=None,
-                 wait_time_between_tests=0, use_example=True, dry_run=False,
-                 extra_headers={}):
+def swagger_test(swagger_yaml_path: str,
+                 expected_status_codes: Set[int],
+                 app_client: Client,
+                 special_status_code_for_paths=None,
+                 wait_time_between_tests: int = 0,
+                 use_example: bool = True,
+                 extra_headers: Dict[str, str] = None):
     """Test the given swagger api.
 
-    Test with either a swagger.yaml path for a connexion app or with an API
+    Test with either a swagger.yaml path for with an API
     URL if you have a running API.
 
     Args:
         swagger_yaml_path: path of your YAML swagger file.
-        app_url: URL of the swagger api.
-        authorize_error: dict containing the error you don't want to raise.
+        app_client: Client of the swagger api.
+        expected_status_codes: Expected status codes
+        special_status_code_for_paths: dict containing the error you don't want to raise.
                          ex: {
                             'get': {
                                 '/pet/': ['404']
@@ -209,44 +211,37 @@ def swagger_test(swagger_yaml_path=None, app_url=None, authorize_error=None,
                          Will ignore 404 when getting a pet.
         wait_time_between_tests: an number that will be used as waiting time between tests [in seconds].
         use_example: use example of your swagger file instead of generated data.
-        dry_run: don't actually execute the test, only show what would be sent
         extra_headers: additional headers you may want to send for all operations
 
     Raises:
         ValueError: In case you specify neither a swagger.yaml path or an app URL.
     """
+
+    if special_status_code_for_paths is None:
+        special_status_code_for_paths = {}
+    if extra_headers is None:
+        extra_headers = {}
     for _ in swagger_test_yield(swagger_yaml_path=swagger_yaml_path,
-                                app_url=app_url,
-                                authorize_error=authorize_error,
+                                app_client=app_client,
+                                expected_status_codes=expected_status_codes,
+                                special_status_code_for_paths=special_status_code_for_paths,
                                 wait_time_between_tests=wait_time_between_tests,
                                 use_example=use_example,
-                                dry_run=dry_run,
                                 extra_headers=extra_headers):
         pass
 
 
-def swagger_test_yield(swagger_yaml_path=None, app_url=None, authorize_error=None,
-                       wait_time_between_tests=0, use_example=True, dry_run=False,
-                       extra_headers={}):
+def swagger_test_yield(swagger_yaml_path: str,
+                       expected_status_codes: Set[int],
+                       app_client: Client,
+                       special_status_code_for_paths: Dict[str, Dict[str, int]],
+                       wait_time_between_tests: int,
+                       use_example: bool,
+                       extra_headers: Dict[str, str]):
     """Test the given swagger api. Yield the action and operation done for each test.
 
-    Test with either a swagger.yaml path for a connexion app or with an API
+    Test with either a swagger.yaml path with an API
     URL if you have a running API.
-
-    Args:
-        swagger_yaml_path: path of your YAML swagger file.
-        app_url: URL of the swagger api.
-        authorize_error: dict containing the error you don't want to raise.
-                         ex: {
-                            'get': {
-                                '/pet/': ['404']
-                            }
-                         }
-                         Will ignore 404 when getting a pet.
-        wait_time_between_tests: an number that will be used as waiting time between tests [in seconds].
-        use_example: use example of your swagger file instead of generated data.
-        dry_run: don't actually execute the test, only show what would be sent
-        extra_headers: additional headers you may want to send for all operations
 
     Returns:
         Yield between each test: (action, operation)
@@ -254,28 +249,14 @@ def swagger_test_yield(swagger_yaml_path=None, app_url=None, authorize_error=Non
     Raises:
         ValueError: In case you specify neither a swagger.yaml path or an app URL.
     """
-    if authorize_error is None:
-        authorize_error = {}
+    if extra_headers is None:
+        extra_headers = {}
+    if special_status_code_for_paths is None:
+        special_status_code_for_paths = {}
 
-    # Init test
-    if swagger_yaml_path is not None and app_url is not None:
-        app_client = requests
-        swagger_parser = SwaggerParser(swagger_yaml_path, use_example=use_example)
-    elif swagger_yaml_path is not None:
-        specification_dir = os.path.dirname(os.path.realpath(swagger_yaml_path))
-        app = connexion.App(__name__, port=8080, debug=True, specification_dir=specification_dir)
-        app.add_api(os.path.basename(swagger_yaml_path))
-        app_client = app.app.test_client()
-        swagger_parser = SwaggerParser(swagger_yaml_path, use_example=use_example)
-    elif app_url is not None:
-        app_client = requests
-        remote_swagger_def = requests.get(u'{0}/swagger.json'.format(app_url)).json()
-        swagger_parser = SwaggerParser(swagger_dict=remote_swagger_def, use_example=use_example)
-    else:
-        raise ValueError('You must either specify a swagger.yaml path or an app url')
+    swagger_parser = SwaggerParser(swagger_yaml_path, use_example=use_example)
 
-    print("Starting testrun against {0} or {1} using examples: "
-          "{2}".format(swagger_yaml_path, app_url, use_example))
+    print(f'Starting testrun against {swagger_yaml_path} or {app_client} using examples: {use_example}')
 
     operation_sorted = {method: [] for method in _HTTP_METHODS}
 
@@ -296,45 +277,33 @@ def swagger_test_yield(swagger_yaml_path=None, app_url=None, authorize_error=Non
             client_name = getattr(app_client, '__name__', 'FlaskClient')
 
             request_args = get_request_args(path, action, swagger_parser)
+            logger.info(f'Sending {request_args} to {path} via {action}')
             url, body, headers, files = get_url_body_from_request(action, path, request_args, swagger_parser)
 
             logger.info(u'TESTING {0} {1}'.format(action.upper(), url))
 
             # Add any extra headers specified by the user
-            headers.extend([(key, value)for key, value in extra_headers.items()])
+            headers.extend([(key, value) for key, value in extra_headers.items()])
 
-            if swagger_yaml_path is not None and app_url is None:
-                if dry_run:
-                    logger.info("\nWould send %s to %s with body %s and headers %s" %
-                                (action.upper(), url, body, headers))
-                    continue
-                response = get_method_from_action(app_client, action)(url, headers=headers, data=body)
-            else:
-                if app_url.endswith(swagger_parser.base_path):
-                    base_url = app_url[:-len(swagger_parser.base_path)]
-                else:
-                    base_url = app_url
-                full_path = u'{0}{1}'.format(base_url, url)
-                if dry_run:
-                    logger.info("\nWould send %s to %s with body %s and headers %s" %
-                                (action.upper(), full_path, body, headers))
-                    continue
-                response = get_method_from_action(app_client, action)(full_path,
-                                                                      headers=dict(headers),
-                                                                      data=body,
-                                                                      files=files)
+            response = get_method_from_action(app_client, action)(url,
+                                                                  headers=dict(headers),
+                                                                  data=body)
 
             logger.info(u'Using {0}, got status code {1} for ********** {2} {3}'.format(
                 client_name, response.status_code, action.upper(), url))
 
             # Check if authorize error
-            if (action in authorize_error and path in authorize_error[action] and
-                    response.status_code in authorize_error[action][path]):
-                logger.info(u'Got expected authorized error on {0} with status {1}'.format(url, response.status_code))
-                yield (action, operation)
-                continue
+            if action in special_status_code_for_paths and path in special_status_code_for_paths[action]:
+                if response.status_code in special_status_code_for_paths[action][path]:
+                    logger.info(f'Got expected authorized error on {url} with status {response.status_code}')
+                else:
+                    raise AssertionError(f'Invalid status code for path {path}, action {action} and body: {body}: '
+                                         f'{response.status_code}')
+            elif response.status_code not in expected_status_codes:
+                raise AssertionError(f'Status code {response.status_code} was not expected '
+                                     f'for path {path}, action {action} and body: {body}: ')
 
-            if response.status_code is not 404:
+            if response.status_code != 404:
                 # Get valid request and response body
                 body_req = swagger_parser.get_send_request_correct_body(path, action)
 
@@ -345,28 +314,16 @@ def swagger_test_yield(swagger_yaml_path=None, app_url=None, authorize_error=Non
                     continue
 
                 # Get response data
-                if hasattr(response, 'content'):
-                    response_text = response.content
-                else:
-                    response_text = response.data
-
-                # Convert to str
-                if hasattr(response_text, 'decode'):
-                    response_text = response_text.decode('utf-8')
-
-                # Get json
-                try:
-                    response_json = json.loads(response_text)
-                except ValueError:
-                    response_json = response_text
+                response_json = response.json
 
                 if response.status_code in response_spec.keys():
                     validate_definition(swagger_parser, response_spec[response.status_code], response_json)
-                elif 'default' in response_spec.keys():
-                    validate_definition(swagger_parser, response_spec['default'], response_json)
+                # elif 'default' in response_spec.keys():
+                #     validate_definition(swagger_parser, response_spec['default'], response_json)
                 else:
-                    raise AssertionError('Invalid status code {0}. Expected: {1}'.format(response.status_code,
-                                                                                         response_spec.keys()))
+                    raise AssertionError(f'Invalid status code for path {path}, action {action} and body: {body}: '
+                                         f'{response.status_code}.'
+                                         f' Expected: {response_spec.keys()}')
 
                 if wait_time_between_tests > 0:
                     time.sleep(wait_time_between_tests)
