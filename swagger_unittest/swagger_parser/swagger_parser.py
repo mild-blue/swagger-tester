@@ -10,6 +10,7 @@ import re
 import sys
 from copy import deepcopy
 from io import StringIO
+from typing import Dict
 
 import jinja2
 import six
@@ -186,7 +187,7 @@ class SwaggerParser(object):
             return self._example_from_array_spec(prop_spec)
         # File
         if prop_spec['type'] == 'file':
-            return (StringIO('my file contents'), 'hello world.txt')
+            return StringIO('my file contents'), 'hello world.txt'
         # Date time
         if 'format' in prop_spec.keys() and prop_spec['format'] == 'date-time':
             return self._get_example_from_basic_type('datetime')
@@ -246,26 +247,26 @@ class SwaggerParser(object):
         return example, additional_property
 
     @staticmethod
-    def _get_example_from_basic_type(type):
+    def _get_example_from_basic_type(basic_type: str):
         """Get example from the given type.
 
         Args:
-            type: the type you want an example of.
+            basic_type: the type you want an example of.
 
         Returns:
             An array with two example values of the given type.
         """
-        if type == 'integer':
+        if basic_type == 'integer':
             return 1
-        elif type == 'number':
+        elif basic_type == 'number':
             return 0.0
-        elif type == 'string':
+        elif basic_type == 'string':
             return 'string'
-        elif type == 'datetime':
+        elif basic_type == 'datetime':
             return '2015-08-28T09:02:57.481Z'
-        elif type == 'boolean':
+        elif basic_type == 'boolean':
             return False
-        elif type == 'null':
+        elif basic_type == 'null':
             return 'null'
 
     @staticmethod
@@ -282,9 +283,9 @@ class SwaggerParser(object):
         """
         assert isinstance(example, dict)
 
-        def _has_simple_type(value):
+        def _has_simple_type(val):
             accepted = (str, int, float, bool)
-            return isinstance(value, accepted)
+            return isinstance(val, accepted)
 
         definition = {
             'type': 'object',
@@ -293,7 +294,6 @@ class SwaggerParser(object):
         for key, value in example.items():
             if not _has_simple_type(value):
                 raise Exception('Not implemented yet')
-            ret_value = None
             if isinstance(value, str):
                 ret_value = {'type': 'string'}
             elif isinstance(value, int):
@@ -417,11 +417,11 @@ class SwaggerParser(object):
                     prop_example[prop_name] = example
             return [prop_example]
 
-    def get_dict_definition(self, dict, get_list=False):
+    def get_dict_definition(self, dictionary: Dict, get_list: bool = False):
         """Get the definition name of the given dict.
 
         Args:
-            dict: dict to test.
+            dictionary: dict to test.
             get_list: if set to true, return a list of definition that match the body.
                       if False, only return the first.
 
@@ -431,7 +431,7 @@ class SwaggerParser(object):
         """
         list_def_candidate = []
         for definition_name in self.specification['definitions'].keys():
-            if self.validate_definition(definition_name, dict):
+            if self.validate_definition(definition_name, dictionary):
                 if not get_list:
                     return definition_name
                 list_def_candidate.append(definition_name)
@@ -488,12 +488,13 @@ class SwaggerParser(object):
         except Exception:
             return False
 
-    def validate_definition(self, definition_name, dict_to_test, definition=None):
+    def validate_definition(self, definition_name: str, dict_to_test: Dict, definition: Dict = None):
         """Validate the given dict according to the given definition.
 
         Args:
             definition_name: name of the the definition.
             dict_to_test: dict to test.
+            definition: definition
 
         Returns:
             True if the given dict match the definition, False otherwise.
@@ -551,7 +552,7 @@ class SwaggerParser(object):
                     any(not self.check_type(item, properties_spec['items']['type']) for item in value)):
                 return False
             # Check ref
-            elif ('$ref' in properties_spec['items'].keys()):
+            elif '$ref' in properties_spec['items'].keys():
                 def_name = self.get_definition_name_from_ref(properties_spec['items']['$ref'])
                 if any(not self.validate_definition(def_name, item) for item in value):
                     return False
@@ -608,7 +609,8 @@ class SwaggerParser(object):
                     self.paths[path][http_method]['consumes'] = action['consumes']
 
     def _add_parameters(self, parameter_map, parameter_list):
-        """Populates the given parameter map with the list of parameters provided, resolving any reference objects encountered.
+        """Populates the given parameter map with the list of parameters provided, resolving any reference objects
+         encountered.
 
         Args:
             parameter_map: mapping from parameter names to parameter objects
@@ -665,11 +667,11 @@ class SwaggerParser(object):
         # Test action if given
         if path_spec is not None and action is not None:
             if action not in path_spec.keys():
-                return (None, None)
+                return None, None
             else:
                 path_spec = path_spec[action]
 
-        return (path_name, path_spec)
+        return path_name, path_spec
 
     def validate_request(self, path, action, body=None, query=None):
         """Check if the given request is valid.
@@ -800,8 +802,8 @@ class SwaggerParser(object):
                         if len(body) > 0 and not self.validate_definition(definition_name, body[0]):
                             msg = 'The body did not validate against its definition'
                             return False, msg
-                    elif ('type' in param_spec['schema'].keys() and not
-                    self.check_type(body, param_spec['schema']['type'])):
+                    elif ('type' in param_spec['schema'].keys() and
+                          not self.check_type(body, param_spec['schema']['type'])):
                         # Type but not array
                         msg = 'Check type did not validate for {0} and {1}'.format(param_spec['schema']['type'], body)
                         return False, msg
@@ -842,19 +844,17 @@ class SwaggerParser(object):
         else:
             return ''
 
-    def get_request_data(self, path, action, body=None):
+    def get_request_data(self, path, action):
         """Get the default data and status code of the given path + action request.
 
         Args:
             path: path of the request.
             action: action of the request(get, post, delete...)
-            body: body sent, used to sent it back for post request.
 
         Returns:
             A tuple with the default response data and status code
             In case of default status_code, use 0
         """
-        body = body or ''
         path_name, path_spec = self.get_path_spec(path)
         response = {}
 

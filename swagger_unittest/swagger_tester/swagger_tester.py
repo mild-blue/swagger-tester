@@ -256,7 +256,7 @@ def swagger_test_yield(swagger_yaml_path: str,
 
     swagger_parser = SwaggerParser(swagger_yaml_path, use_example=use_example)
 
-    print(f'Starting testrun against {swagger_yaml_path} or {app_client} using examples: {use_example}')
+    print(f'Starting test run against {swagger_yaml_path} or {app_client} using examples: {use_example}')
 
     operation_sorted = {method: [] for method in _HTTP_METHODS}
 
@@ -304,11 +304,9 @@ def swagger_test_yield(swagger_yaml_path: str,
                                      f'for path {path}, action {action} and body: {body}: ')
 
             if response.status_code != 404:
-                # Get valid request and response body
-                body_req = swagger_parser.get_send_request_correct_body(path, action)
 
                 try:
-                    response_spec = swagger_parser.get_request_data(path, action, body_req)
+                    response_spec = swagger_parser.get_request_data(path, action)
                 except (TypeError, ValueError) as exc:
                     logger.warning(u'Error in the swagger file: {0}'.format(repr(exc)))
                     continue
@@ -318,8 +316,6 @@ def swagger_test_yield(swagger_yaml_path: str,
 
                 if response.status_code in response_spec.keys():
                     validate_definition(swagger_parser, response_spec[response.status_code], response_json)
-                # elif 'default' in response_spec.keys():
-                #     validate_definition(swagger_parser, response_spec['default'], response_json)
                 else:
                     raise AssertionError(f'Invalid status code for path {path}, action {action} and body: {body}: '
                                          f'{response.status_code}.'
@@ -328,7 +324,7 @@ def swagger_test_yield(swagger_yaml_path: str,
                 if wait_time_between_tests > 0:
                     time.sleep(wait_time_between_tests)
 
-                yield (action, operation)
+                yield action, operation
             else:
                 # 404 => Postpone retry
                 if {'action': action, 'operation': operation} in postponed:  # Already postponed => raise error
@@ -336,5 +332,5 @@ def swagger_test_yield(swagger_yaml_path: str,
 
                 operation_sorted[action].append(operation)
                 postponed.append({'action': action, 'operation': operation})
-                yield (action, operation)
+                yield action, operation
                 continue
