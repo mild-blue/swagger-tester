@@ -81,7 +81,6 @@ def get_path_data():
             'description': u'successful \xb5-\xf8per\xe4tio\xf1',
             'schema': {
                 '$ref': '#/definitions/Pet',
-                'x-scope': ['']
             }
         },
         '400': {'description': 'Invalid ID supplied'},
@@ -103,7 +102,6 @@ def post_put_path_data():
         'required': False,
         'schema': {
             '$ref': '#/definitions/Pet',
-            'x-scope': ['']
         }
     }
     pet_put = pet_post.copy()
@@ -112,7 +110,6 @@ def post_put_path_data():
         'description': 'Created',
         'schema': {
             '$ref': '#/definitions/Pet',
-            'x-scope': ['']
         }
     }
     expected_post_put_paths = {

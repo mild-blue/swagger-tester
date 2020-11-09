@@ -169,6 +169,9 @@ class SwaggerParser(object):
         # From definition
         if '$ref' in prop_spec.keys():
             return self._example_from_definition(prop_spec)
+        # Process AllOf section
+        if 'allOf' in prop_spec.keys():
+            return self._example_from_allof(prop_spec)
         # Complex type
         if 'type' not in prop_spec:
             return self._example_from_complex_def(prop_spec)
@@ -323,6 +326,22 @@ class SwaggerParser(object):
                 return example_dict
             example = dict((example_name, example_value) for example_name, example_value in example_dict.items())
             return example
+
+    def _example_from_allof(self, prop_spec):
+        """Get the examples from an allOf section.
+        Args:
+            prop_spec: property specification you want an example of.
+        Returns:
+            An example dict
+        """
+        example_dict = {}
+        for definition in prop_spec['allOf']:
+            update = self.get_example_from_prop_spec(definition)
+            print(update)
+            if isinstance(update, list):
+                update = update[0]
+            example_dict.update(update)
+        return example_dict
 
     def _example_from_complex_def(self, prop_spec):
         """Get an example from a property specification.
