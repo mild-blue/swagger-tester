@@ -15,6 +15,8 @@ from setuptools import find_packages, setup
 
 here = path.abspath(path.dirname(__file__))
 
+VERSION = '0.3.0'
+
 # Get the long description from the README file
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
@@ -25,17 +27,17 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.3.0-alpha',
+    version=VERSION,
 
     description='Unittest swagger',
     long_description=long_description,
 
     # The project's main homepage.
     url='https://github.com/mild-blue/swagger-tester',
-    download_url='https://github.com/mild-blue/swagger-tester/releases/tag/v0.3.0-alpha',
+    download_url=f'https://github.com/mild-blue/swagger-tester/releases/download/0.3.0/swagger-unittest-{VERSION}.tar.gz',
     # Author details
-    author='jankubant',
-    author_email='jan.kubant@gmail.com',
+    author='Mild Blue',
+    author_email='info@mild.blue',
 
     # Choose your license
     license='MIT',
@@ -94,8 +96,8 @@ setup(
     # for example:
     # $ pip install -e .[dev,test]
     extras_require={
-        'dev': [],
-        'test': ['nose'],
+        'dev': ['pre-commit'],
+        'test': ['pytest', 'requests'],
     },
 
     # If there are data files included in your packages that need to be
