@@ -2,7 +2,7 @@
 
 import pytest
 
-from swagger_parser import SwaggerParser
+from swagger_unittest.swagger_parser.swagger_parser import SwaggerParser
 
 
 @pytest.fixture

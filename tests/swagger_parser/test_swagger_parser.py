@@ -4,8 +4,7 @@ from copy import deepcopy
 import pytest
 import requests
 
-# whatever is defined in the petstore, we should be able to parse the json
-from swagger_parser import SwaggerParser
+from swagger_unittest.swagger_parser.swagger_parser import SwaggerParser
 
 
 def test_validate_petstore_swagger_json():
