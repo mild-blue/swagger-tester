@@ -11,7 +11,7 @@ from codecs import open
 from os import path
 
 # Always prefer setuptools over distutils
-from setuptools import setup
+from setuptools import find_packages, setup
 
 here = path.abspath(path.dirname(__file__))
 
@@ -25,14 +25,14 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.0.1',
+    version='0.3.0-alpha',
 
     description='Unittest swagger',
     long_description=long_description,
 
     # The project's main homepage.
     url='https://github.com/mild-blue/swagger-tester',
-    download_url='https://github.com/user/reponame/archive/v_01.tar.gz',
+    download_url='https://github.com/mild-blue/swagger-tester/releases/tag/v0.3.0-alpha',
     # Author details
     author='jankubant',
     author_email='jan.kubant@gmail.com',
@@ -67,9 +67,7 @@ setup(
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=[
-        'swagger_unittest',
-    ],
+    packages=find_packages(),
 
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:
