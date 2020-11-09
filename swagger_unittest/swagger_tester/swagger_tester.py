@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 import six
 from werkzeug import Client
 
-from swagger_parser import SwaggerParser
+from swagger_unittest.swagger_parser.swagger_parser import SwaggerParser
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
