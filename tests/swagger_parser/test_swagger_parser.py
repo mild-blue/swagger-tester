@@ -67,6 +67,9 @@ def test_check_type(swagger_parser):
     assert not swagger_parser.check_type(False, 'string')
     assert swagger_parser.check_type(False, 'boolean')
 
+    # Test object
+    assert swagger_parser.check_type({'a': 'test'}, 'object')
+    assert not swagger_parser.check_type(1, 'object')
     # Test other
     assert not swagger_parser.check_type(swagger_parser, 'string')
 
