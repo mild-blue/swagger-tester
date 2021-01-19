@@ -506,6 +506,8 @@ class SwaggerParser(object):
 
         # Check all required in dict_to_test
         spec_def = definition or self.specification['definitions'][definition_name]
+        if not isinstance(dict_to_test, dict):
+            return False
         all_required_keys_present = all(req in dict_to_test.keys() for req in spec_def.get('required', {}))
         if 'required' in spec_def and not all_required_keys_present:
             return False
