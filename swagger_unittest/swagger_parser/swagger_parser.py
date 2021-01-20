@@ -147,8 +147,9 @@ class SwaggerParser(object):
                     (isinstance(value, (six.text_type, six.string_types,)) and
                      value.lower() in ['true', 'false'])
                     )
-        else:
-            return False
+        elif type_def == 'object':
+            return isinstance(value, dict)
+        return False
 
     def get_example_from_prop_spec(self, prop_spec):
         """Return an example value from a property specification.
