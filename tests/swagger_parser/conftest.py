@@ -25,6 +25,11 @@ def inline_parser():
     return SwaggerParser('data/inline.yaml')
 
 
+@pytest.fixture
+def swagger_enum_parser():
+    return SwaggerParser('data/enum.yaml')
+
+
 @pytest.fixture(scope='module',
                 params=['data/no_properties.yaml',
                         'data/object_no_schema.yaml',
