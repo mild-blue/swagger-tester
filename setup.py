@@ -7,6 +7,7 @@ https://github.com/pypa/sampleproject
 """
 
 # To use a consistent encoding
+import os
 from codecs import open
 from os import path
 
@@ -15,7 +16,7 @@ from setuptools import find_packages, setup
 
 here = path.abspath(path.dirname(__file__))
 
-VERSION = '0.3.0'
+VERSION = os.getenv('VERSION')
 
 # Get the long description from the README file
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
