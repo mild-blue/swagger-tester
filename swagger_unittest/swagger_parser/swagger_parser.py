@@ -489,12 +489,12 @@ class SwaggerParser(object):
         except Exception:
             return False
 
-    def validate_definition(self, definition_name: str, dict_to_test: Dict, definition: Dict = None):
+    def validate_definition(self, definition_name: str, expected_value: Dict, definition: Dict = None):
         """Validate the given dict according to the given definition.
 
         Args:
             definition_name: name of the the definition.
-            dict_to_test: dict to test.
+            expected_value: dict or scalar value to test.
             definition: definition
 
         Returns:
@@ -507,19 +507,23 @@ class SwaggerParser(object):
 
         # Check all required in dict_to_test
         spec_def = definition or self.specification['definitions'][definition_name]
-        all_required_keys_present = all(req in dict_to_test.keys() for req in spec_def.get('required', {}))
-        if 'required' in spec_def and not all_required_keys_present:
-            return False
+        if isinstance(expected_value, dict):
+            all_required_keys_present = all(req in expected_value.keys() for req in spec_def.get('required', {}))
+            if 'required' in spec_def and not all_required_keys_present:
+                return False
 
-        # Check no extra arg & type
-        properties_dict = spec_def.get('properties', {})
-        for key, value in dict_to_test.items():
-            if value is not None:
-                if key not in properties_dict:  # Extra arg
-                    return False
-                else:  # Check type
-                    if not self._validate_type(properties_dict[key], value):
+            # Check no extra arg & type
+            properties_dict = spec_def.get('properties', {})
+            for key, value in expected_value.items():
+                if value is not None:
+                    if key not in properties_dict:  # Extra arg
                         return False
+                    else:  # Check type
+                        if not self._validate_type(properties_dict[key], value):
+                            return False
+        else:
+            # Definition corresponds to scalar value (string for instance)
+            return self.check_type(expected_value, spec_def['type'])
 
         return True
 

@@ -218,6 +218,17 @@ def test_validate_definition(swagger_parser, pet_definition_example):
     pet_definition_example['name'] = 2
     assert not swagger_parser.validate_definition('Pet', pet_definition_example)
 
+    # Check string instead of dict_to_test
+    assert not swagger_parser.validate_definition('Pet', 'foo')
+
+
+def test_validate_enum_definition(swagger_enum_parser):
+    # Check string instead of dict_to_test
+    assert swagger_enum_parser.validate_definition('my_enum', 'OPTION_A')
+
+    # TODO: also check for correct enum value (currently enum is treated as string)
+    assert swagger_enum_parser.validate_definition('my_enum', 'FOO_BAR')
+
 
 def test_get_paths_data(swagger_parser, post_put_path_data, get_path_data):
     swagger_parser.get_paths_data()

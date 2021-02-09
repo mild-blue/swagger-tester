@@ -84,8 +84,12 @@ def validate_definition(swagger_parser, valid_response, response):
         # Check if there is a definition that match body and response
         valid_definition = swagger_parser.get_dict_definition(valid_response, get_list=True)
         actual_definition = swagger_parser.get_dict_definition(response, get_list=True)
-        assert len(set(valid_definition).intersection(actual_definition)) >= 1, \
-            f'Responses {valid_response} and {response} not compatible'
+        assert len(set(valid_definition).intersection(actual_definition)) >= 1, (
+            f'Responses are not compatible. Definition of valid response is {valid_definition} which is different '
+            f'than definition of actual response which is {actual_definition}. \n'
+            f'Valid response: {valid_response} \n'
+            f'Actual response: {response}'
+        )
 
 
 def parse_parameters(url, action, path, request_args, swagger_parser):
