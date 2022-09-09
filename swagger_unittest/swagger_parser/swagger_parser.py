@@ -147,9 +147,12 @@ class SwaggerParser(object):
                     (isinstance(value, (six.text_type, six.string_types,)) and
                      value.lower() in ['true', 'false'])
                     )
+        # TODO improve type checking https://github.com/mild-blue/swagger-unittest/issues/10
         elif type_def == 'object':
             return isinstance(value, dict)
-        return False
+        elif type_def == 'array':
+            return isinstance(value, list)
+        raise AttributeError(f"Unexpected type of value to check {type(value)} with value {value}")
 
     def get_example_from_prop_spec(self, prop_spec):
         """Return an example value from a property specification.
