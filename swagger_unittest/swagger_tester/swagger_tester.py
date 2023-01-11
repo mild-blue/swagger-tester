@@ -260,7 +260,7 @@ def swagger_test_yield(swagger_yaml_path: str,
 
     swagger_parser = SwaggerParser(swagger_yaml_path, use_example=use_example)
 
-    print(f'Starting test run against {swagger_yaml_path} or {app_client} using examples: {use_example}')
+    logger.info(f'Starting test run against {swagger_yaml_path} or {app_client} using examples: {use_example}')
 
     operation_sorted = {method: [] for method in _HTTP_METHODS}
 

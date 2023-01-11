@@ -16,6 +16,8 @@ import jinja2
 import six
 import yaml
 
+logger = logging.getLogger(__name__)
+
 
 class SwaggerParser(object):
     """Parse a swagger YAML file.
@@ -200,7 +202,7 @@ class SwaggerParser(object):
             return []
 
         # Default - basic type
-        logging.info('falling back to basic type, no other match found')
+        logger.info('falling back to basic type, no other match found')
         return self._get_example_from_basic_type(prop_spec['type'])
 
     def _get_example_from_properties(self, spec):
@@ -341,7 +343,7 @@ class SwaggerParser(object):
         example_dict = {}
         for definition in prop_spec['allOf']:
             update = self.get_example_from_prop_spec(definition)
-            print(update)
+            logger.debug(update)
             if isinstance(update, list):
                 update = update[0]
             example_dict.update(update)
@@ -714,11 +716,11 @@ class SwaggerParser(object):
         path_name, path_spec = self.get_path_spec(path)
 
         if path_spec is None:  # reject unknown path
-            logging.warning('there is no path')
+            logger.warning('there is no path')
             return False
 
         if action not in path_spec.keys():  # reject unknown http method
-            logging.warning("this http method is unknown '{0}'".format(action))
+            logger.warning("this http method is unknown '{0}'".format(action))
             return False
 
         action_spec = path_spec[action]
@@ -727,7 +729,7 @@ class SwaggerParser(object):
         if action == 'post':
             is_ok, msg = _validate_post_body(body, action_spec)
             if not is_ok:
-                logging.warning("the general post body did not validate due to '{0}'".format(msg))
+                logger.warning("the general post body did not validate due to '{0}'".format(msg))
                 return False
 
         # If the body is empty and it validated so far, we can return here
@@ -739,7 +741,7 @@ class SwaggerParser(object):
         # Check body parameters
         is_ok, msg = self._validate_body_parameters(body, action_spec)
         if not is_ok:
-            logging.warning("the parameters in the body did not validate due to '{0}'".format(msg))
+            logger.warning("the parameters in the body did not validate due to '{0}'".format(msg))
             return False
 
         # Check query parameters
@@ -844,7 +846,7 @@ class SwaggerParser(object):
                         definition_name = self.get_definition_name_from_ref(resp_spec['schema']['items'])
                         return [definition_name]
                     else:
-                        logging.warning('No item type in: ' + resp_spec['schema'])
+                        logger.warning('No item type in: ' + resp_spec['schema'])
                         return ''
                 return [self.definitions_example[definition_name]]
             elif 'type' in resp_spec['schema']:
