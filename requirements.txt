@@ -10,8 +10,10 @@ jinja2==2.11.3
     # via -r requirements.in
 jsonschema==3.2.0
     # via openapi-spec-validator
-markupsafe==1.1.1
-    # via jinja2
+markupsafe==2.1.2
+    # via
+    #   jinja2
+    #   werkzeug
 openapi-spec-validator==0.2.9
     # via -r requirements.in
 pyrsistent==0.17.3
@@ -22,7 +24,7 @@ six==1.15.0
     # via
     #   jsonschema
     #   openapi-spec-validator
-werkzeug==1.0.1
+werkzeug==2.2.3
     # via -r requirements.in
 
 # The following packages are considered to be unsafe in a requirements file:
